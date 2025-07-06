@@ -1,0 +1,10 @@
+{
+    "description":"A simple wireguard UI",
+    "name": "Wireguard UI",
+    "shell-version": [
+    "43"
+  ],
+  "url":"jimmyhodgson.com",
+  "uuid":"wg-ui@jimmyhodgson.com",
+  "version":1
+}
