@@ -22,6 +22,7 @@ The service supports the following commands:
 | status | wg show              | Returns the current connection status of the vpn |
 | start  | wg-quick up client   | Starts the vpn connection                        |
 | stop   | wg-quick down client | Stops the vpn connection                         |
+| info   | wg show all dump     | Returns sent and recv statistics if available    |
 
 ### Testing the API
 

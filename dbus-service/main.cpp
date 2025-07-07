@@ -2,6 +2,7 @@
 #include <glibmm.h>
 #include <csignal>
 #include <iostream>
+#include <vector>
 
 const std::string BUS_NAME = "com.jimmyhodgson.wg";
 const std::string OBJECT_PATH = "/com/jimmyhodgson/wg";
@@ -24,10 +25,30 @@ const char introspection_xml[] = R"XML(
     <method name="status">
         <arg type="a{sv}" name="response" direction="out"/>
     </method>
+    <method name="info">
+        <arg type="a{sv}" name="response" direction="out"/>
+    </method>
   </interface>
 </node>
 )XML";
 
+// Splits a line on tab characters
+std::vector<std::string> splitByTabs(const std::string& line) {
+    std::vector<std::string> parts;
+    std::stringstream ss(line);
+    std::string item;
+    while (std::getline(ss, item, '\t')) {
+        parts.push_back(item);
+    }
+    return parts;
+}
+
+Glib::VariantContainerBase
+    mapToContainerBase(std::map<Glib::ustring, Glib::VariantBase> dict){
+    auto response_map = Glib
+        ::Variant<std::map<Glib::ustring, Glib::VariantBase>>::create(dict);
+    return Glib::VariantContainerBase::create_tuple({ response_map });
+}
 
 void on_method_call(
     const Glib::RefPtr<Gio::DBus::Connection>&,
@@ -38,12 +59,12 @@ void on_method_call(
     const Glib::VariantContainerBase&,
     const Glib::RefPtr<Gio::DBus::MethodInvocation>& invocation)
 {
+    std::map<Glib::ustring, Glib::VariantBase> dict;
+    std::string output;
+    std::string error;
+    int exit_status;
+
     if (method_name == "start") {
-
-        std::string output;
-        std::string error;
-        int exit_status;
-
         Glib::spawn_command_line_sync(
             "wg-quick up client",
             &output,
@@ -52,37 +73,25 @@ void on_method_call(
         );
 
         if(exit_status == 0) {
-            std::map<Glib::ustring, Glib::VariantBase> dict = {
-                { "status", Glib::Variant<bool>::create(true) },
-                { "message", Glib::Variant<Glib::ustring>::create("Started the connection to the VPN") }
-            };
+            
+            dict.insert({ "status", Glib::Variant<bool>::create(true) });
+            dict.insert({ "message",Glib::Variant<Glib::ustring>
+                ::create("Started the connection to the VPN") });
 
-            auto response_map = Glib::Variant<std::map<Glib::ustring, Glib::VariantBase>>::create(dict);
-
-            auto response = Glib::VariantContainerBase::create_tuple({ response_map });
-            invocation->return_value(response);
+            invocation->return_value(mapToContainerBase(dict));
         } else {
-            std::map<Glib::ustring, Glib::VariantBase> dict = {
-                { "status", Glib::Variant<bool>::create(true) },
-                { "message", Glib::Variant<Glib::ustring>::create("Error trying to start the VPN") },
-                { "error", Glib::Variant<Glib::ustring>::create(error) }
-            };
 
-            auto response_map = Glib::Variant<std::map<Glib::ustring, Glib::VariantBase>>::create(dict);
+            dict.insert({ "status", Glib::Variant<bool>::create(true) });
+            dict.insert({ "message", Glib::Variant<Glib::ustring>
+                ::create("Error trying to start the VPN") });
+            dict.insert({ "error", Glib::Variant<Glib::ustring>
+                ::create(error) });
 
-            auto response = Glib::VariantContainerBase::create_tuple({ response_map });
-            invocation->return_value(response);
+            invocation->return_value(mapToContainerBase(dict));
         }
-        
-        
     }
 
     if (method_name == "stop") {
-
-        std::string output;
-        std::string error;
-        int exit_status;
-
         Glib::spawn_command_line_sync(
             "wg-quick down client",
             &output,
@@ -91,35 +100,23 @@ void on_method_call(
         );
 
         if(exit_status == 0) {
-            std::map<Glib::ustring, Glib::VariantBase> dict = {
-                { "status", Glib::Variant<bool>::create(true) },
-                { "message", Glib::Variant<Glib::ustring>::create("Stopped the connection to the VPN") }
-            };
+            dict.insert({ "status", Glib::Variant<bool>::create(true) });
+            dict.insert({ "message", Glib::Variant<Glib::ustring>
+                ::create("Stopped the connection to the VPN") });
 
-            auto response_map = Glib::Variant<std::map<Glib::ustring, Glib::VariantBase>>::create(dict);
-
-            auto response = Glib::VariantContainerBase::create_tuple({ response_map });
-            invocation->return_value(response);
+            invocation->return_value(mapToContainerBase(dict));
         } else {
-            std::map<Glib::ustring, Glib::VariantBase> dict = {
-                { "status", Glib::Variant<bool>::create(false) },
-                { "message", Glib::Variant<Glib::ustring>::create("Error trying to stop the VPN") },
-                { "error", Glib::Variant<Glib::ustring>::create(error)}
-            };
+            dict.insert({ "status", Glib::Variant<bool>::create(false) });
+            dict.insert({ "message", Glib::Variant<Glib::ustring>
+                ::create("Error trying to stop the VPN") });
+            dict.insert({ "error", Glib::Variant<Glib::ustring>
+                ::create(error)});
 
-            auto response_map = Glib::Variant<std::map<Glib::ustring, Glib::VariantBase>>::create(dict);
-
-            auto response = Glib::VariantContainerBase::create_tuple({ response_map });
-            invocation->return_value(response);
+            invocation->return_value(mapToContainerBase(dict));
         }
     }
 
     if (method_name == "status") {
-
-        std::string output;
-        std::string error;
-        int exit_status;
-
         Glib::spawn_command_line_sync(
             "wg show",
             &output,
@@ -130,15 +127,39 @@ void on_method_call(
         int status = !output.empty();
         std::string message = status ? "connected":"disconnected";
 
-        std::map<Glib::ustring, Glib::VariantBase> dict = {
-            { "status", Glib::Variant<bool>::create(status) },
-            { "message", Glib::Variant<Glib::ustring>::create(message) }
-        };
+        dict.insert({ "status", Glib::Variant<bool>::create(status) });
+        dict.insert({ "message", Glib::Variant<Glib::ustring>
+            ::create(message) });
 
-        auto response_map = Glib::Variant<std::map<Glib::ustring, Glib::VariantBase>>::create(dict);
+        invocation->return_value(mapToContainerBase(dict));
+    }
 
-        auto response = Glib::VariantContainerBase::create_tuple({ response_map });
-        invocation->return_value(response);
+    if (method_name == "info") {
+        Glib::spawn_command_line_sync(
+            "wg show all dump",
+            &output,
+            &error,
+            &exit_status
+        );
+
+        int status = !output.empty();
+        std::string message = status ? "connected":"disconnected";
+
+        dict.insert({ "status", Glib::Variant<bool>::create(status) });
+        dict.insert({ "message", Glib::Variant<Glib::ustring>
+            ::create(message) });
+
+        if(!output.empty()){
+            std::vector<std::string> split = splitByTabs(output);
+
+            double sent = std::stod(split[10]);
+            double recv = std::stod(split[11]);
+
+            dict.insert({"sent", Glib::Variant<double>::create(sent)});
+            dict.insert({"recv", Glib::Variant<double>::create(recv)});
+        }
+
+        invocation->return_value(mapToContainerBase(dict));
     }
 }
 
@@ -156,8 +177,10 @@ interface_name, const Glib::ustring& property_name) {
     property = Glib::Variant<Glib::ustring>::create("");
 }
 
-void on_bus_acquired(const Glib::RefPtr<Gio::DBus::Connection>& connection, const Glib::ustring& name) {
-    auto introspection_data = Gio::DBus::NodeInfo::create_for_xml(introspection_xml);
+void on_bus_acquired(const Glib::RefPtr<Gio::DBus::Connection>& connection,
+    const Glib::ustring& name) {
+    auto introspection_data = Gio::DBus::NodeInfo
+        ::create_for_xml(introspection_xml);
     auto interface_info = introspection_data->lookup_interface(INTERFACE_NAME);
 
     connection->register_object(
@@ -173,11 +196,15 @@ int main() {
 
     auto onBusAcquired = Gio::DBus::SlotBusAcquired(&on_bus_acquired);
 
-    auto methodCall = Gio::DBus::InterfaceVTable::SlotInterfaceMethodCall(&on_method_call);
-    auto getProperty = Gio::DBus::InterfaceVTable::SlotInterfaceGetProperty(&on_interface_get_property);
-    auto setProperty = Gio::DBus::InterfaceVTable::SlotInterfaceSetProperty(&on_interface_set_property);
+    auto methodCall = Gio::DBus::InterfaceVTable
+        ::SlotInterfaceMethodCall(&on_method_call);
+    auto getProperty = Gio::DBus::InterfaceVTable
+        ::SlotInterfaceGetProperty(&on_interface_get_property);
+    auto setProperty = Gio::DBus::InterfaceVTable
+        ::SlotInterfaceSetProperty(&on_interface_set_property);
     
-    vtable = std::make_unique<Gio::DBus::InterfaceVTable>(methodCall, getProperty, setProperty);
+    vtable = std::make_unique<Gio::DBus::InterfaceVTable>(methodCall,
+        getProperty, setProperty);
 
     Gio::DBus::own_name(
         Gio::DBus::BUS_TYPE_SYSTEM,
@@ -185,11 +212,13 @@ int main() {
         // on_bus_acquired
         onBusAcquired,
         // on_name_acquired
-        [](const Glib::RefPtr<Gio::DBus::Connection>&, const Glib::ustring& name) {
+        [](const Glib::RefPtr<Gio::DBus::Connection>&,
+            const Glib::ustring& name) {
             std::cout << "Acquired name: " << name << std::endl;
         },
         // on_name_lost
-        [](const Glib::RefPtr<Gio::DBus::Connection>&, const Glib::ustring& name) {
+        [](const Glib::RefPtr<Gio::DBus::Connection>&,
+            const Glib::ustring& name) {
             std::cerr << "Lost name: " << name << std::endl;
         }
     );
