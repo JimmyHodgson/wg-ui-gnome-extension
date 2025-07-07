@@ -8,6 +8,43 @@ const PopupMenu = imports.ui.popupMenu;
 
 const GLib = imports.gi.GLib;
 
+function sendNotification(icon, message) {
+    try {
+        // Create proxy
+            let proxy = new Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SESSION,
+                Gio.DBusProxyFlags.NONE,
+                null,
+                'org.freedesktop.Notifications',
+                '/org/freedesktop/Notifications',
+                'org.freedesktop.Notifications',
+                null
+            );
+
+            proxy.call(
+                "Notify",
+                new GLib.Variant("(susssasa{sv}i)",
+                    [
+                        'WireguardUI',  // s: app_name
+                        0,              // u: replaces_id
+                        icon,           // s: app_icon
+                        'Wireguard UI', // s: summary
+                        message,        // s: body
+                        [],             // as: actions
+                        {},             // a{sv}: hints
+                        -1              // i: expire_timeout
+                    ]
+                ),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                null,
+                (proxy, res) => {}
+            );
+    } catch(e){
+        logError(e,"Unable to send notification");
+    }
+}
+
 /**
  * 
  * @param {string} method name of the method to call 
@@ -31,7 +68,7 @@ function callService(method) {
             );
 
             // Call the method
-            let resultVariant = proxy.call(
+            proxy.call(
                 method,
                 null,
                 Gio.DBusCallFlags.NONE,
@@ -143,6 +180,8 @@ class Extension {
         if (result.status.deep_unpack()) {
             this.icon.remove_style_class_name('logo-white');
             this.icon.add_style_class_name('logo-red');
+
+            sendNotification('network-vpn',"Connected");
         } else {
             log(result.error.deep_unpack());
         }
@@ -157,6 +196,7 @@ class Extension {
         if (result.status.deep_unpack()) {
             this.icon.remove_style_class_name('logo-red');
             this.icon.add_style_class_name('logo-white');
+            sendNotification('network-vpn-disconnected',"Disconnected");
         } else {
             log(result.error.deep_unpack());
         }
