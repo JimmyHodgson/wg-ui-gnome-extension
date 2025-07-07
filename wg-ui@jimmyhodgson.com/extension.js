@@ -135,7 +135,6 @@ class Extension {
             let box = new St.BoxLayout();
             this.icon = new St.Icon({
                 gicon: this.gioIcon,
-                icon_size: 16,
                 style_class: `system-status-icon ${initialColor}`
             });
 
